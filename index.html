@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Robot Controller</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --border: #2a2a3a;
+    --accent: #00ff88;
+    --accent2: #ff3366;
+    --accent3: #3399ff;
+    --text: #e8e8f0;
+    --muted: #666680;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px 40px;
+    gap: 20px;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  * { position: relative; z-index: 1; }
+
+  /* ── HEADER ── */
+  header {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+  }
+
+  .logo span { color: var(--text); }
+
+  /* ── STATUS BAR ── */
+  .status-bar {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .status-dot.connected {
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  .status-dot.error { background: var(--accent2); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .status-text {
+    flex: 1;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+  .status-text.connected { color: var(--accent); }
+  .status-text.error { color: var(--accent2); }
+
+  /* ── CONNECT BUTTON ── */
+  .btn-connect {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .btn-connect:active { background: var(--accent); color: var(--bg); }
+  .btn-connect.connected {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+  .btn-connect.connected:active { background: var(--accent2); color: var(--bg); }
+
+  /* ── MODE TOGGLE ── */
+  .mode-toggle {
+    width: 100%;
+    max-width: 420px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .btn-mode {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-mode.active {
+    background: rgba(0,255,136,0.08);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn-mode:active { transform: scale(0.97); }
+
+  /* ── DPAD ── */
+  .dpad-wrapper {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dpad-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    align-self: flex-start;
+  }
+
+  .dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 80px);
+    grid-template-rows: repeat(3, 80px);
+    gap: 6px;
+  }
+
+  .dpad-btn {
+    background: #1a1a25;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .dpad-btn svg { width: 28px; height: 28px; stroke: var(--muted); transition: stroke 0.1s; }
+
+  .dpad-btn:active,
+  .dpad-btn.pressed {
+    background: rgba(0,255,136,0.12);
+    border-color: var(--accent);
+    transform: scale(0.93);
+  }
+  .dpad-btn:active svg,
+  .dpad-btn.pressed svg { stroke: var(--accent); }
+
+  .dpad-btn.stop {
+    background: rgba(255,51,102,0.08);
+    border-color: rgba(255,51,102,0.3);
+  }
+  .dpad-btn.stop svg { stroke: var(--accent2); }
+  .dpad-btn.stop:active { background: rgba(255,51,102,0.2); border-color: var(--accent2); }
+
+  .dpad-empty { background: transparent; border: none; pointer-events: none; }
+
+  /* ── ROBOT STATUS / CONTROLS ── */
+  .controls-row {
+    width: 100%;
+    max-width: 420px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .ctrl-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 14px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .ctrl-btn:active { transform: scale(0.96); }
+
+  .ctrl-btn.start {
+    border-color: rgba(0,255,136,0.4);
+    color: var(--accent);
+  }
+  .ctrl-btn.start:active { background: rgba(0,255,136,0.1); }
+
+  .ctrl-btn.stop-robot {
+    border-color: rgba(255,51,102,0.4);
+    color: var(--accent2);
+  }
+  .ctrl-btn.stop-robot:active { background: rgba(255,51,102,0.1); }
+
+  /* ── LOG ── */
+  .log-box {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+    min-height: 60px;
+    max-height: 100px;
+    overflow-y: auto;
+  }
+
+  .log-box .entry { display: block; }
+  .log-box .entry.ok { color: var(--accent); }
+  .log-box .entry.err { color: var(--accent2); }
+  .log-box .entry.cmd { color: var(--accent3); }
+
+  /* ── SPEED SLIDER ── */
+  .speed-row {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .speed-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .speed-val {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(0,255,136,0.4);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">ROBOT<span>_CTL</span></div>
+  <div style="font-size:10px;color:var(--muted);letter-spacing:1px">S4 · ESIEA</div>
+</header>
+
+<!-- Status -->
+<div class="status-bar">
+  <div class="status-dot" id="dot"></div>
+  <div class="status-text" id="statusText">Non connecté — appuie sur CONNECT</div>
+  <button class="btn-connect" id="btnConnect" onclick="toggleConnect()">CONNECT</button>
+</div>
+
+<!-- Mode -->
+<div class="mode-toggle">
+  <button class="btn-mode active" id="modeCircuit" onclick="setMode('circuit')">⬡ Circuit</button>
+  <button class="btn-mode" id="modeLaby" onclick="setMode('laby')">⬢ Labyrinthe</button>
+</div>
+
+<!-- Start / Stop robot -->
+<div class="controls-row">
+  <button class="ctrl-btn start" onclick="send('%A')">▶ Démarrer</button>
+  <button class="ctrl-btn stop-robot" onclick="send('%X')">■ Arrêter</button>
+</div>
+
+<!-- DPad -->
+<div class="dpad-wrapper">
+  <div class="dpad-label">Contrôle directionnel</div>
+  <div class="dpad">
+    <div class="dpad-empty"></div>
+    <div class="dpad-btn" id="btn-F"
+         ontouchstart="pressBtn('F','%F')" ontouchend="releaseBtn('F','%S')"
+         onmousedown="pressBtn('F','%F')" onmouseup="releaseBtn('F','%S')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="18 15 12 9 6 15"/>
+      </svg>
+    </div>
+    <div class="dpad-empty"></div>
+
+    <div class="dpad-btn" id="btn-L"
+         ontouchstart="pressBtn('L','%L')" ontouchend="releaseBtn('L','%S')"
+         onmousedown="pressBtn('L','%L')" onmouseup="releaseBtn('L','%S')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </div>
+    <div class="dpad-btn stop" onclick="send('%S')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="6" y="6" width="12" height="12" rx="2"/>
+      </svg>
+    </div>
+    <div class="dpad-btn" id="btn-R"
+         ontouchstart="pressBtn('R','%R')" ontouchend="releaseBtn('R','%S')"
+         onmousedown="pressBtn('R','%R')" onmouseup="releaseBtn('R','%S')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </div>
+
+    <div class="dpad-empty"></div>
+    <div class="dpad-btn" id="btn-B"
+         ontouchstart="pressBtn('B','%B')" ontouchend="releaseBtn('B','%S')"
+         onmousedown="pressBtn('B','%B')" onmouseup="releaseBtn('B','%S')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </div>
+    <div class="dpad-empty"></div>
+  </div>
+</div>
+
+<!-- Log -->
+<div class="log-box" id="log">
+  <span class="entry">› En attente de connexion...</span>
+</div>
+
+<script>
+// ── BLE CONFIG ──────────────────────────────────────────────
+const SERVICE_UUID      = '0000ffe0-0000-1000-8000-00805f9b34fb';
+const CHARACTERISTIC_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
+
+let device = null;
+let characteristic = null;
+let connected = false;
+
+// ── LOG ─────────────────────────────────────────────────────
+function log(msg, type = '') {
+  const box = document.getElementById('log');
+  const el = document.createElement('span');
+  el.className = 'entry ' + type;
+  el.textContent = '› ' + msg;
+  box.appendChild(document.createElement('br'));
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ── CONNECT / DISCONNECT ─────────────────────────────────────
+async function toggleConnect() {
+  if (connected) {
+    disconnect();
+    return;
+  }
+  try {
+    setStatus('Recherche du JDY-16...', '');
+    log('Scan Bluetooth...');
+
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'JDY-16' }],
+      optionalServices: [SERVICE_UUID]
+    });
+
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    log('JDY-16 trouvé, connexion GATT...', 'ok');
+
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+    connected = true;
+    setStatus('Connecté à ' + device.name, 'connected');
+    document.getElementById('btnConnect').textContent = 'DISCONNECT';
+    document.getElementById('btnConnect').classList.add('connected');
+    log('Connecté ! Prêt à envoyer des commandes.', 'ok');
+
+  } catch (err) {
+    log('Erreur : ' + err.message, 'err');
+    setStatus('Erreur de connexion', 'error');
+  }
+}
+
+function disconnect() {
+  if (device && device.gatt.connected) {
+    device.gatt.disconnect();
+  }
+  onDisconnected();
+}
+
+function onDisconnected() {
+  connected = false;
+  characteristic = null;
+  setStatus('Déconnecté', '');
+  document.getElementById('btnConnect').textContent = 'CONNECT';
+  document.getElementById('btnConnect').classList.remove('connected');
+  log('Déconnecté.', 'err');
+}
+
+// ── SEND COMMAND ─────────────────────────────────────────────
+async function send(cmd) {
+  if (!connected || !characteristic) {
+    log('Non connecté !', 'err');
+    return;
+  }
+  try {
+    const encoder = new TextEncoder();
+    await characteristic.writeValue(encoder.encode(cmd));
+    log('CMD → ' + cmd, 'cmd');
+  } catch (err) {
+    log('Erreur envoi : ' + err.message, 'err');
+  }
+}
+
+// ── DPAD : appui maintenu ────────────────────────────────────
+function pressBtn(id, cmd) {
+  document.getElementById('btn-' + id)?.classList.add('pressed');
+  send(cmd);
+}
+function releaseBtn(id, stopCmd) {
+  document.getElementById('btn-' + id)?.classList.remove('pressed');
+  send(stopCmd);
+}
+
+// ── MODE ─────────────────────────────────────────────────────
+function setMode(mode) {
+  if (mode === 'circuit') {
+    document.getElementById('modeCircuit').classList.add('active');
+    document.getElementById('modeLaby').classList.remove('active');
+    send('%C');
+  } else {
+    document.getElementById('modeLaby').classList.add('active');
+    document.getElementById('modeCircuit').classList.remove('active');
+    send('%M');
+  }
+}
+
+// ── STATUS ───────────────────────────────────────────────────
+function setStatus(msg, type) {
+  const dot = document.getElementById('dot');
+  const txt = document.getElementById('statusText');
+  dot.className = 'status-dot ' + type;
+  txt.className = 'status-text ' + type;
+  txt.textContent = msg;
+}
+
+// Bloquer le scroll pendant le dpad
+document.querySelectorAll('.dpad-btn').forEach(btn => {
+  btn.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  btn.addEventListener('touchend',   e => e.preventDefault(), { passive: false });
+});
+</script>
+</body>
+</html>
